@@ -1,6 +1,7 @@
 %% Life-Cycle Model 20: Idiosyncratic shocks that depend on age
 clear,clc,close all
-myf = 'C:\Users\aledi\Documents\GitHub\VFIToolkit-matlab';
+%myf = 'C:\Users\aledi\Documents\GitHub\VFIToolkit-matlab';
+myf = 'C:\Users\aledi\OneDrive\Documents\GitHub\VFIToolkit-matlab';
 addpath(genpath(myf))
 
 %% How does VFI Toolkit think about this?
@@ -18,7 +19,7 @@ Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
 n_d = 0; % Endogenous labour choice (fraction of time worked)
-n_a = 1500; % Endogenous asset holdings
+n_a = 1000; % Endogenous asset holdings
 n_z = 2; % Exogenous labor productivity units shock
 N_j = Params.J; % Number of periods in finite horizon
 
@@ -83,6 +84,9 @@ for jj=1:N_j
     pi_z_J(:,:,jj) = weight_young(jj)*pi_z_young+(1-weight_young(jj))*pi_z_old;
 end
 
+% z_grid_J = [0,1]';
+% pi_z_J = [0.5,0.5; 0.5,0.5];
+
 [mean_z,~,~,statdist_z]=MarkovChainMoments(z_grid_J(:,1),pi_z_J(:,:,1));
 
 %% Now, create the return function 
@@ -95,7 +99,7 @@ ReturnFn = @(aprime,a,z,theta,agej,Jr,kappa_j,w,r,pension,sigma) Mod_ReturnFn(ap
 disp('Test ValueFnIter')
 vfoptions=struct(); % Just using the defaults.
 vfoptions.verbose = 1;
-vfoptions.divideandconquer = 0;
+vfoptions.divideandconquer = 1;
 vfoptions.level1n = 11;
 tic;
 [V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,N_i, d_grid, a_grid, z_grid_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames, vfoptions);
