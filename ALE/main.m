@@ -183,12 +183,21 @@ StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNam
 mu_a_PT1 = sum(StationaryDist.ptype001,[2,3,4]);
 mu_a_PT2 = sum(StationaryDist.ptype002,[2,3,4]);
 
-%% FnsToEvaluate are how we say what we want to graph the life-cycles of
+%% FnsToEvaluate and conditional restrictions
 
+%--- Functions to be evaluatated for statistics, etc.
 FnsToEvaluate.consumption = @(aprime,a,zn,zh,theta,agej,Jr,kappa_j,varrho,w,r,pension) Mod_Cons(aprime,a,zn,zh,theta,agej,Jr,kappa_j,varrho,w,r,pension);
 FnsToEvaluate.income = @(aprime,a,zn,zh,theta,agej,Jr,kappa_j,varrho,w,pension) Mod_Income(aprime,a,zn,zh,theta,agej,Jr,kappa_j,varrho,w,pension); 
 FnsToEvaluate.assets = @(aprime,a,zn,zh) a; % a is the current asset holdings
 FnsToEvaluate.frac_badhealth=@(aprime,a,zn,zh) (zh==0); % indicator for z=0 (bad health) 
+
+%--- Conditional restrictions. Must return either 0 or 1
+conditionalrestrictions.sick = @(aprime,a,zn,zh) (zh==0);
+conditionalrestrictions.healthy = @(aprime,a,zn,zh) (zh==1);
+% Add additional field to simoptions
+simoptions.conditionalrestrictions = conditionalrestrictions;
+
+[ave] = MyCondStats(StationaryDist,Policy,n_z,z_grid_J,a_grid,n_a,N_i,N_j,Params,FnsToEvaluate);
 
 %% Calculate the life-cycle profiles
 AgeStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,N_i,d_grid,a_grid,z_grid_J,simoptions);
@@ -200,6 +209,9 @@ for ii=1:numel(vars)
     cv.(var_name) = AgeStats.(var_name).StdDeviation./AgeStats.(var_name).Mean;
 end
 
+%% Calculate aggregate statistics
+AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1_PType(StationaryDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,N_i,d_grid,a_grid,z_grid_J,simoptions);
+
 figure
 plot(a_grid,mu_a_PT1)
 hold on
@@ -207,6 +219,7 @@ plot(a_grid,mu_a_PT2)
 legend('No college','College')
 title('Stationary Distribution')
 
+% Average income and consumption over the lifecycle
 figure
 plot(Params.agej,AgeStats.income.Mean)
 hold on
@@ -215,6 +228,7 @@ legend('Income','Consumption')
 xlabel('Age, j')
 title('Income and Consumption, Average')
 
+% Assets by permanent type
 figure
 plot(Params.agej,AgeStats.assets.ptype001.Mean)
 hold on
@@ -237,3 +251,22 @@ plot(Params.agej,cv.consumption)
 xlabel('Age, j')
 legend('Income','Consumption')
 title('Coefficient of variation')
+
+% Consumption by health status (sick vs healthy) and by education type (1 vs 2)
+figure
+plot(Params.agej,AgeStats.sick.consumption.ptype001.Mean,':','Linewidth',2)
+hold on 
+plot(Params.agej,AgeStats.healthy.consumption.ptype001.Mean,"-.",'Linewidth',2)
+hold on
+plot(Params.agej,AgeStats.sick.consumption.ptype002.Mean,"--",'Linewidth',2)
+hold on 
+plot(Params.agej,AgeStats.healthy.consumption.ptype002.Mean,'Linewidth',2)
+legend('Bad health, no college','Good health, no college','Bad health, college','Good health, college')
+xlabel('Age, j')
+title('Consumption')
+
+% cons, given zh=zh(1) sick,theta(1),age
+figure
+plot(Params.agej,AgeStats.sick.consumption.ptype001.Mean)
+hold on
+plot(Params.agej,squeeze(ave.consumption(1,1,:)))
