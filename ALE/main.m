@@ -1,5 +1,8 @@
 %% Life-Cycle Model 20: Idiosyncratic shocks that depend on age
 % TODO: Make transition matrix of health shock, pi(zh,zh'|j), depend on permanent type theta
+% The next step is to make the transition matrix for health shock depend on permanent type theta. 
+%This requires using vfoptions.ExogShockFn where ExogShockFn is a function that returns [z_grid,pi_z]
+
 clear,clc,close all
 myf = 'C:\Users\aledi\Documents\GitHub\VFIToolkit-matlab';
 addpath(genpath(myf))
