@@ -1,18 +1,16 @@
-%% Life-Cycle Model 20: Idiosyncratic shocks that depend on age
-% TODO: Make transition matrix of health shock, pi(zh,zh'|j), depend on permanent type theta
-% The next step is to make the transition matrix for health shock depend on permanent type theta. 
-%This requires using vfoptions.ExogShockFn where ExogShockFn is a function that returns [z_grid,pi_z]
+%% Life-Cycle Model with health shocks
+% TODO: Add medical expenses if bad health and welfare transfers 
 
 clear,clc,close all
 myf = 'C:\Users\aledi\Documents\GitHub\VFIToolkit-matlab';
 addpath(genpath(myf))
 
 %% How does VFI Toolkit think about this?
-% (aprime,a,z,theta,j)
-% Endogenous state variable:           a, assets (total household savings)
-% Stochastic exogenous state variable: z, 'unemployment' shock
-% Permanent type:                      theta
-% Age:                                 j
+% Ordering of variables: (aprime,a,z(1),z(2),theta,j)
+% 1 Endogenous state variable:           a, assets 
+% 2 Stochastic exogenous state variable: z, income shock and health shock
+% 1 Permanent type (low vs high):        theta
+%   Age:                                 j
 
 %% Set options
 vfoptions=struct(); % Just using the defaults.
@@ -74,11 +72,13 @@ Params.dj=[0.006879, 0.000463, 0.000307, 0.000220, 0.000184, 0.000172, 0.000160,
 Params.sj=1-Params.dj(21:101); % Conditional survival probabilities
 Params.sj(end)=0; % In the present model the last period (j=J) value of sj is actually irrelevant
 
-% Income penalty for bad health
-Params.varrho = exp(-0.2);
+% Income penalty for bad health. It varies by permanent type. We assume
+% that the low type loses more if bad health happens
+Params.varrho.low  = exp(-0.2);
+Params.varrho.high = exp(-0.1);
 
-%% Permanent type
-N_i = 2;
+%% Permanent type PT
+N_i = {'low','high'}; % No college vs college, or fixed income effect
 sigma_theta = 0.245; % Variance of PT
 % Impose the two moment conditions:
 % 0.5*theta(1)+0.5*theta(2)=0 (mean zero) ==> theta(2)=-theta(1)
@@ -89,65 +89,33 @@ PTypeDistParamNames={'theta_dist'};
 Params.theta_dist=[0.5,0.5]; 
 
 %% Grids
-% The ^3 means that there are more points near 0 and near 10. We know from
-% theory that the value function will be more 'curved' near zero assets,
-% and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
+a_min = 0;
 a_max = 400;
-a_grid=a_max*(linspace(0,1,n_a).^3)'; % The ^3 means most points are near zero, which is where the derivative of the value fn changes most.
-
+a_spacing = 3;
+a_grid=a_min+(a_max-a_min)*(linspace(0,1,n_a).^a_spacing)'; 
 d_grid=[];
 
 %% z_grid and pi_z age-dependent
-% The prob of being unemployed should decrease with age
-
-% Income shock
-sigma_eps = sqrt(0.022); % Stdev of innovation to z
-rho       = 0.985; % Persistence
-[zn_grid,pi_zn]=discretizeAR1_Rouwenhorst(0.0,rho,sigma_eps,n_z(1));
-zn_grid = exp(zn_grid);
-
-% Make income shock age-dependent even if it is not
-zn_grid_J = repmat(zn_grid,1,N_j); 
-pi_zn_J = repmat(pi_zn,1,1,N_j);
-
-% Health shock, age-dependent
-dist_health = [0.05,0.95]; % 5% in bad health at age j=1
-zh_grid_J = repmat([0,1]',1,N_j); % 0=bad health, 1=good health
-% Prob of having bad health tomorrow given that health is bad
-p_bb = linspace(0.6,0.9,N_j)';
-% Prob of having bad health tomorrow given that health is good
-p_gb = linspace(0.1,0.4,N_j)';
-pi_zh_J = zeros(n_z(2),n_z(2),N_j);
-for jj=1:N_j
-    % from bad to bad
-    pi_zh_J(1,1,jj) = p_bb(jj);
-    pi_zh_J(1,2,jj) = 1-p_bb(jj);
-    % from good to bad
-    pi_zh_J(2,1,jj) = p_gb(jj);
-    pi_zh_J(2,2,jj) = 1-p_gb(jj);
-end
-disp('Check pi_zh_J...')
-check_markov_age(pi_zh_J,n_z(2),Params.J)
-
-% Combine income and health shock into a single shock
-z_grid_J = [zn_grid_J;zh_grid_J]; % [n_z(1)+n_z(2),J]
-pi_z_J   = zeros(prod(n_z),prod(n_z),N_j);
-for jj=1:N_j
-    pi_z_J(:,:,jj)   = kron(pi_zh_J(:,:,jj),pi_zn_J(:,:,jj)); 
-end
-disp('Check pi_z_J...')
-check_markov_age(pi_z_J,prod(n_z),Params.J)
+% z = [zn,zh] where zn=income shock, zh=health shock
+Params.sigma_eps = sqrt(0.022); % Stdev of innovation to z
+Params.rho       = 0.985; % Persistence
+[z_grid_J,pi_z_J,zh_grid_J,pi_zh_J,dist_health] = create_shocks(n_z,N_j,Params);
 
 % Own calculation
-zh_prob = zeros(n_z(2),Params.J);
-zh_prob(:,1) = dist_health;
+zh_prob.low = zeros(n_z(2),Params.J);
+zh_prob.low(:,1) = dist_health;
+zh_prob.high = zeros(n_z(2),Params.J);
+zh_prob.high(:,1) = dist_health;
 for jj=1:Params.J-1
-    zh_prob(:,jj+1) = zh_prob(:,jj)'*pi_zh_J(:,:,jj);
+    zh_prob.low(:,jj+1) = zh_prob.low(:,jj)'*pi_zh_J.low(:,:,jj);
+    zh_prob.high(:,jj+1) = zh_prob.high(:,jj)'*pi_zh_J.high(:,:,jj);
 end
-
 figure
-plot(Params.agej,zh_prob(1,:))
-title('Share of ppl with bad health over lifecycle')
+plot(Params.agej,zh_prob.low(1,:))
+hold on
+plot(Params.agej,zh_prob.high(1,:))
+legend('Low \theta','high \theta')
+title('Share of ppl with bad health, for each type \theta')
 xlabel('Age, j')
 
 %% Now, create the return function 
@@ -184,8 +152,8 @@ StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNam
 % Again, we will explain in a later model what the stationary distribution
 % is, it is not important for our current goal of graphing the life-cycle profile
 
-mu_a_PT1 = sum(StationaryDist.ptype001,[2,3,4]);
-mu_a_PT2 = sum(StationaryDist.ptype002,[2,3,4]);
+mu_a_PT1 = sum(StationaryDist.low,[2,3,4]);
+mu_a_PT2 = sum(StationaryDist.high,[2,3,4]);
 
 %% FnsToEvaluate and conditional restrictions
 
@@ -234,18 +202,21 @@ title('Income and Consumption, Average')
 
 % Assets by permanent type
 figure
-plot(Params.agej,AgeStats.assets.ptype001.Mean)
+plot(Params.agej,AgeStats.assets.low.Mean)
 hold on
 plot(Params.agej,AgeStats.assets.Mean)
 hold on
-plot(Params.agej,AgeStats.assets.ptype002.Mean)
+plot(Params.agej,AgeStats.assets.high.Mean)
 legend('No college','All','College')
 xlabel('Age, j')
 title('Assets')
 
 figure
-plot(Params.agej,AgeStats.frac_badhealth.Mean)
-title('Share of bad health')
+plot(Params.agej,AgeStats.frac_badhealth.low.Mean)
+hold on
+plot(Params.agej,AgeStats.frac_badhealth.high.Mean)
+legend('Low \theta','high \theta')
+title('Share of ppl with bad health, for each type \theta')
 xlabel('Age, j')
 
 figure
@@ -256,21 +227,35 @@ xlabel('Age, j')
 legend('Income','Consumption')
 title('Coefficient of variation')
 
-% Consumption by health status (sick vs healthy) and by education type (1 vs 2)
+% Consumption by health status (sick vs healthy) and by education type (low vs high)
 figure
-plot(Params.agej,AgeStats.sick.consumption.ptype001.Mean,':','Linewidth',2)
+plot(Params.agej,AgeStats.sick.consumption.low.Mean,':','Linewidth',2)
 hold on 
-plot(Params.agej,AgeStats.healthy.consumption.ptype001.Mean,"-.",'Linewidth',2)
+plot(Params.agej,AgeStats.healthy.consumption.low.Mean,"-.",'Linewidth',2)
 hold on
-plot(Params.agej,AgeStats.sick.consumption.ptype002.Mean,"--",'Linewidth',2)
+plot(Params.agej,AgeStats.sick.consumption.high.Mean,"--",'Linewidth',2)
 hold on 
-plot(Params.agej,AgeStats.healthy.consumption.ptype002.Mean,'Linewidth',2)
+plot(Params.agej,AgeStats.healthy.consumption.high.Mean,'Linewidth',2)
 legend('Bad health, no college','Good health, no college','Bad health, college','Good health, college')
 xlabel('Age, j')
 title('Consumption')
 
+% Assets by health status (sick vs healthy) and by education type (low vs high)
+figure
+plot(Params.agej,AgeStats.sick.assets.low.Mean,':','Linewidth',2)
+hold on 
+plot(Params.agej,AgeStats.healthy.assets.low.Mean,"-.",'Linewidth',2)
+hold on
+plot(Params.agej,AgeStats.sick.assets.high.Mean,"--",'Linewidth',2)
+hold on 
+plot(Params.agej,AgeStats.healthy.assets.high.Mean,'Linewidth',2)
+legend('Bad health, no college','Good health, no college','Bad health, college','Good health, college')
+xlabel('Age, j')
+title('Assets')
+
 % cons, given zh=zh(1) sick,theta(1),age
 figure
-plot(Params.agej,AgeStats.sick.consumption.ptype001.Mean)
+plot(Params.agej,AgeStats.sick.consumption.low.Mean)
 hold on
 plot(Params.agej,squeeze(ave.consumption(1,1,:)))
+title('Average consumption given health=0 and PT is low')

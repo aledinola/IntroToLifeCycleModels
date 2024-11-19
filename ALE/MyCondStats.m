@@ -11,14 +11,20 @@ function [ave] = MyCondStats(StatDist,Policy,n_z,z_grid,a_grid,n_a,N_i,N_j,P,Fns
 
 n_zn    = n_z(1);
 n_zh    = n_z(2);
-n_theta = N_i;
+if iscell(N_i)
+    n_theta = numel(N_i);
+else
+    n_theta = N_i;
+end
 
 z_grid_J   = gather(z_grid);
 
 [mu,Policy] = reshape_VandPolicy(StatDist,Policy,n_a,n_z,N_i,N_j);
 
-zn_grid_J = z_grid_J(1:n_zn,:);
-zh_grid_J = z_grid_J(n_zn+1:n_zn+n_zh,:);
+% Note: the grids for zn and zh do not depend on the PT theta, so can use
+% an arbitrary value for theta
+zn_grid_J = gather(z_grid_J.low(1:n_zn,:));
+zh_grid_J = gather(z_grid_J.low(n_zn+1:n_zn+n_zh,:));
 
 frac_types = zeros(n_zh,n_theta,N_j);
 
@@ -42,8 +48,15 @@ for a_c=1:n_a
     zn = zn_grid_J(zn_c,jj);
     zh = zh_grid_J(zh_c,jj);
     theta = P.theta(theta_c);
+    if theta_c==1 %low type
+        varrho = P.varrho.low;
+    elseif theta_c==2 %high type
+        varrho = P.varrho.high;
+    else
+        error('theta_c is out of bounds')
+    end
     Values_c(a_c,zn_c,zh_c,theta_c,jj)=...
-        FnsToEvaluate.consumption(aprime,a,zn,zh,theta,P.agej(jj),P.Jr,P.kappa_j(jj),P.varrho,P.w,P.r,P.pension);
+        FnsToEvaluate.consumption(aprime,a,zn,zh,theta,P.agej(jj),P.Jr,P.kappa_j(jj),varrho,P.w,P.r,P.pension);
 end
 end
 end
