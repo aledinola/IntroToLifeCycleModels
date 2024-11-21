@@ -1,4 +1,6 @@
 %% Life-Cycle Model 11A: Idiosyncratic shocks again, persistent and transitory
+clear,clc,close all
+addpath(genpath())
 % Use two exogenous shocks: z1 and z2, persistent and transitory shocks to labor efficiency units, respectively
 %
 % The second exogenous shock is i.i.d.
