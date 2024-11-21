@@ -1,4 +1,6 @@
 %% Life-Cycle Model 24: Using Permanent Type to model fixed-effects
+clear,clc,close all
+addpath(genpath(fullfile('..','VFIToolkit-matlab')))
 % The exogenous process on labor efficiency units now uses an approach common in the literature:
 % Labor efficiency units are a combination of four components:
 % 1) kappa_j, a deterministic profile of age
@@ -154,6 +156,9 @@ ReturnFn=@(h,aprime,a,z,e,w,sigma,psi,eta,agej,Jr,pension,r,alpha_i,kappa_j,warm
 
 %% Now solve the value function iteration problem, just to check that things are working before we go to General Equilbrium
 disp('Test ValueFnIter')
+vfoptions.verbose=1;
+vfoptions.divideandconquer=1;
+vfoptions.level1n = 11;
 tic;
 vfoptions.verbose=1; % Just so we can see feedback on progress
 [V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,N_i, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, vfoptions);
