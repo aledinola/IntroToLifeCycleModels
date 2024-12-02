@@ -1,4 +1,4 @@
-function F=AleModel24_ReturnFn(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,eta,agej,Jr,pen,r,cut)
+function F=fun_earnings(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut)
 % The first four are the 'always required' decision variables, next period
 % endogenous states, this period endogenous states, exogenous states
 % After that we need all the parameters the return function uses, it
@@ -13,13 +13,9 @@ if z2==0
 end
 
 if agej<Jr % If working age
-    c=w*kappa_j*theta_i*z1*e*prod_loss*h+(1+r)*a-aprime; % Add z here
+    F=w*kappa_j*theta_i*z1*e*prod_loss*h; % Add z here
 else % Retirement
-    c=pen+(1+r)*a-aprime;
-end
-
-if c>0
-    F=(c^(1-sigma))/(1-sigma) -psi*(h^(1+eta))/(1+eta); % The utility function
+    F=pen;
 end
 
 end %end function

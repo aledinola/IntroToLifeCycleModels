@@ -107,8 +107,8 @@ z_grid1=exp(z_grid1); % Take exponential of the grid
 z_grid1=z_grid1/mean_z1; % Normalise the grid on z (so that the mean of z is 1)
 
 % Second, the health shock z2
-Params.cutoff = 0.75;
-z_grid2 = [0.5,1]'; %0=bad health, 1=good health
+Params.cut = 0.5; % productivity cut if health is bad
+z_grid2 = [0,1]'; %0=bad health, 1=good health
 pi_z2 = [0.6, 0.4;
          0.2, 0.8];
 aux = pi_z2^1000;
@@ -142,8 +142,8 @@ pi_z   = kron(pi_z2,pi_z1); % kron in reverse order
 %% Now, create the return function 
 DiscountFactorParamNames={'beta','sj'};
 
-ReturnFn=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,eta,agej,Jr,pen,r)...
-    AleModel24_ReturnFn(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,eta,agej,Jr,pen,r);
+ReturnFn=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,eta,agej,Jr,pen,r,cut)...
+    AleModel24_ReturnFn(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,eta,agej,Jr,pen,r,cut);
 
 %% Now solve the value function iteration problem, just to check that things are working before we go to General Equilbrium
 disp('Test ValueFnIter')
@@ -200,14 +200,15 @@ mu_a = sum(mu,[2,3,4,5,6]);
 % Like with return function, we have to include (h,aprime,a,z) as first
 % inputs, then just any relevant parameters.
 FnsToEvaluate.hours=@(h,aprime,a,z1,z2,e) h; % h is fraction of time worked
-FnsToEvaluate.earnings=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,pen) w*kappa_j*theta_i*z1*z2*e*h+pen; 
+FnsToEvaluate.earnings=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut)...
+    fun_earnings(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut);
 FnsToEvaluate.assets=@(h,aprime,a,z1,z2,e) a; % a is the current asset holdings
 FnsToEvaluate.theta_i=@(h,aprime,a,z1,z2,e,theta_i) theta_i; % theta_i is the fixed effect
-FnsToEvaluate.share_sick=@(h,aprime,a,z1,z2,e,cutoff) (z2<cutoff);
+FnsToEvaluate.share_sick=@(h,aprime,a,z1,z2,e) (z2==0); %share of sick people
 
 %--- Conditional restrictions. Must return either 0 or 1
-condres.sick = @(h,aprime,a,z1,z2,e,cutoff) (z2<cutoff);
-condres.healthy = @(h,aprime,a,z1,z2,e,cutoff) (z2>cutoff);
+condres.sick = @(h,aprime,a,z1,z2,e) (z2==0);
+condres.healthy = @(h,aprime,a,z1,z2,e) (z2==1);
 % Add additional field to simoptions
 simoptions.conditionalrestrictions = condres;
 
@@ -280,7 +281,8 @@ for a_c=1:n_a
     e = e_grid(e_c);
     theta = Params.theta_i(theta_c);
     Values(a_c,z1_c,z2_c,e_c,theta_c,j) = ...
-        FnsToEvaluate.earnings(h,aprime,a_val,z1,z2,e,theta,Params.kappa_j(j),Params.w,Params.pen);
+        FnsToEvaluate.earnings(h,aprime,a_val,z1,z2,e,theta,Params.kappa_j(j),...
+        Params.w,Params.agej(j),Params.Jr,Params.pen,Params.cut);
 end
 end
 end
@@ -296,6 +298,9 @@ for j=1:N_j
 end
 
 err = abs(income_sick2-income_sick1);
+
+disp('Error toolkit vs my code:')
+max(err)
 
 figure
 plot(err')
