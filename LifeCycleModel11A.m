@@ -1,6 +1,5 @@
 %% Life-Cycle Model 11A: Idiosyncratic shocks again, persistent and transitory
 clear,clc,close all
-addpath(genpath(fullfile('..','VFIToolkit-matlab')))
 % Use two exogenous shocks: z1 and z2, persistent and transitory shocks to labor efficiency units, respectively
 %
 % The second exogenous shock is i.i.d.
@@ -23,7 +22,7 @@ Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 % Grid sizes to use
 n_d=51; % Endogenous labour choice (fraction of time worked)
 n_a=201; % Endogenous asset holdings
-n_z=[21,5]; % Exogenous labor productivity units shocks, persistent and transitiory
+n_z=[7,5]; % Exogenous labor productivity units shocks, persistent and transitiory
 N_j=Params.J; % Number of periods in finite horizon
 
 %% Parameters
@@ -111,9 +110,8 @@ ReturnFn=@(h,aprime,a,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,kappa_j,warmglow1,
 %% Now solve the value function iteration problem, just to check that things are working before we go to General Equilbrium
 disp('Test ValueFnIter')
 vfoptions=struct(); % Just using the defaults.
-vfoptions.verbose=1;
-vfoptions.divideandconquer=1;
-vfoptions.level1n = 17;
+vfoptions.verbose = 1;
+vfoptions.lowmemory=2;
 tic;
 [V, Policy]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions);
 toc
@@ -176,10 +174,6 @@ AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEva
 
 %% Plot the life cycle profiles of fraction-of-time-worked, earnings, and assets
 
-mu_a = sum(StationaryDist,[2,3,4]);
-figure
-plot(a_grid,mu_a)
-
 figure(1)
 subplot(3,1,1); plot(1:1:Params.J,AgeConditionalStats.fractiontimeworked.Mean)
 title('Life Cycle Profile: Fraction Time Worked (h)')
@@ -187,4 +181,3 @@ subplot(3,1,2); plot(1:1:Params.J,AgeConditionalStats.earnings.Mean)
 title('Life Cycle Profile: Labor Earnings (w kappa_j h)')
 subplot(3,1,3); plot(1:1:Params.J,AgeConditionalStats.assets.Mean)
 title('Life Cycle Profile: Assets (a)')
-

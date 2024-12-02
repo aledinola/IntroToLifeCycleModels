@@ -1,5 +1,5 @@
 % Adds fertility and children to 'Life Cycle Model 9' from 'Introduction to Life-Cycle Models'
-%
+clear,clc,close all
 % Uses what VFI Toolkit call a "semi-exogenous state". An exogenous state that can be influenced by the decision variables.
 % The changes to life-cycle model 9 involve adding a decision variable for 'fertility' which influences the two semi-exogenous 
 % states 'number of infants', n1, and 'number of children', n2.
@@ -30,7 +30,7 @@ Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
 n_d=[51,2]; % Endogenous labour choice (fraction of time worked), fertility decision
-n_a=201; % Endogenous asset holdings
+n_a=101; % Endogenous asset holdings
 n_semiz=[2,4]; %number of infants, number of children
 n_z=11; %Exogenous labor productivity units shock
 N_j=Params.J; % Number of periods in finite horizon
