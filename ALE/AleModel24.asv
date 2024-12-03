@@ -86,7 +86,7 @@ Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-P
 Params.rho_z=0.9;
 Params.sigma_epsilon_z=0.02;
 % transitiory iid normal process on idiosyncratic labor productivity units
-%   log(e) follows a Normal distrib. with mean 0 and stdev sigma_epsilon_e
+%   log(e) follows a Normal distrib. with mean 0
 Params.sigma_epsilon_e=0.2; % Implictly, rho_e=0
 
 % Conditional death probabilities
@@ -96,9 +96,7 @@ Params.dj=[0.006879, 0.000463, 0.000307, 0.000220, 0.000184, 0.000172, 0.000160,
     0.071107, 0.078342, 0.086244, 0.094861, 0.104242, 0.114432, 0.125479, 0.137427, 0.150317, 0.164187, 0.179066, 0.194979, 0.211941, 0.229957, 0.249020, 0.269112, 0.290198, 0.312231, 1.000000]; 
 % dj covers Ages 0 to 100
 Params.sj=1-Params.dj(21:101); % Conditional survival probabilities
-% J is the last period so s(J), the prob of being alive in J+1 given that
-% you are alive in J, is equal to 0 by construction.
-Params.sj(end)=0; 
+Params.sj(end)=0; % In the present model the last period (j=J) value of sj is actually irrelevant
 
 %% Grids
 a_max = 100;
@@ -106,23 +104,20 @@ a_grid=a_max*(linspace(0,1,n_a).^3)'; % The ^3 means most points are near zero, 
 
 % First, the AR(1) process z1
 tauchenopt.parallel=0;
-[z1_grid,pi_z1]=discretizeAR1_Tauchen(0,Params.rho_z,Params.sigma_epsilon_z,n_z(1),3,tauchenopt);
-z1_grid=exp(z1_grid); % Take exponential of the grid
-[mean_z1,~,~,~]=MarkovChainMoments(z1_grid,pi_z1); % Calculate the mean of the grid so as can normalise it
-z1_grid=z1_grid/mean_z1; % Normalise the grid on z (so that the mean of z is 1)
+[z_grid1,pi_z1]=discretizeAR1_Tauchen(0,Params.rho_z,Params.sigma_epsilon_z,n_z(1),3,tauchenopt);
+z_grid1=exp(z_grid1); % Take exponential of the grid
+[mean_z1,~,~,~]=MarkovChainMoments(z_grid1,pi_z1); % Calculate the mean of the grid so as can normalise it
+z_grid1=z_grid1/mean_z1; % Normalise the grid on z (so that the mean of z is 1)
 
 % Second, the health shock z2
 Params.cut = 0.5; % productivity cut if health is bad
-z2_grid = [0,1]'; %0=bad health, 1=good health
+z_grid2 = [0,1]'; %0=bad health, 1=good health
 pi_z2 = [0.6, 0.4;
          0.2, 0.8];
 aux = pi_z2^1000;
 z2_stationary = aux(1,:)';
 z2_stationary = z2_stationary/sum(z2_stationary);
-% Initial distribution of z2 at age 1, potentially different from the
-% stationary distribution of pi_z2
-%health_dist   = [0.05,0.95];
-health_dist   = z2_stationary;
+health_dist = [0.05,0.95]; % Initial distribution of z2 at age 1
 % Now the iid normal process e
 [e_grid,pi_e]=discretizeAR1_Tauchen(0,0,Params.sigma_epsilon_e,n_e,3,tauchenopt);
 e_grid=exp(e_grid); % Take exponential of the grid
@@ -142,7 +137,7 @@ h_grid=linspace(0,1,n_d)'; % Notice that it is imposing the 0<=h<=1 condition im
 % Switch into toolkit notation
 d_grid=h_grid;
 
-z_grid = [z1_grid;z2_grid]; % size is [n_z(1)+n_z(2),1]
+z_grid = [z_grid1;z_grid2]; % size is [n_z(1)+n_z(2),1]
 pi_z   = kron(pi_z2,pi_z1); % kron in reverse order
 %z_grid = z_grid1; 
 %pi_z   = pi_z1; 
@@ -175,14 +170,11 @@ disp([length(n_d)+length(n_a),n_a,n_z(1),n_z(2),n_e,N_j])
 %% Initial distribution of agents at birth (j=1)
 % We have to define how agents are at age j=1. We will give them all zero assets.
 jequaloneDist=zeros([n_a,n_z(1),n_z(2),n_e]); % Put no households anywhere on grid
-%jequaloneDist(1,floor((n_z(1)+1)/2),:,floor((n_e+1)/2))=health_dist;
-jequaloneDist(1,floor((n_z(1)+1)/2),2,floor((n_e+1)/2))=1;
-% All agents start with 
-% a:  zero assets 
-% z1: median value
-% z2: it depends
-% e:  median value
-% ***theta: This is permanent type, distrib is fixed and set elsewhere
+% (a,z1,z2,e) given j=1, PT is defined elasewhere
+jequaloneDist(1,floor((n_z(1)+1)/2),:,floor((n_e+1)/2))=z2_stationary; 
+% All agents start with zero assets, the median value of labor productivity
+% shock and from exogenous distribution of health state
+
 
 %% We now compute the 'stationary distribution' of households
 Params.mewj=ones(1,Params.J); % Marginal distribution of households over age
@@ -240,8 +232,6 @@ toc
 
 figure
 plot(1:1:Params.J,AgeStats.share_sick.Mean)
-xlabel('Age, j')
-title('Share of sick households in the pop.')
 
 figure
 plot(1:1:Params.J,AgeStats.sick.earnings.Mean)
@@ -250,19 +240,7 @@ plot(1:1:Params.J,AgeStats.earnings.Mean)
 hold on
 plot(1:1:Params.J,AgeStats.healthy.earnings.Mean)
 hold off
-title('Earnings by health status')
-xlabel('Age, j')
-legend('Sick','All','Healthy')
-
-figure
-plot(1:1:Params.J,AgeStats.sick.assets.Mean)
-hold on
-plot(1:1:Params.J,AgeStats.assets.Mean)
-hold on
-plot(1:1:Params.J,AgeStats.healthy.assets.Mean)
-hold off
-title('Assets by health status')
-xlabel('Age, j')
+title('Earnings by health')
 legend('Sick','All','Healthy')
 
 %% My checks
@@ -283,21 +261,8 @@ ave2.earnings = sum(AgeStats.earnings.Mean.*Params.mewj);
 disp(ave1.earnings)
 disp(ave2.earnings)
 
-ave_by_health.earnings = [AllStats.sick.earnings.Mean,...
-                          AllStats.earnings.Mean,...
-                          AllStats.healthy.earnings.Mean];
-ave_by_health.assets = [AllStats.sick.assets.Mean,...
-                          AllStats.assets.Mean,...
-                          AllStats.healthy.assets.Mean];
-
-disp('SUMMARY STATISTICS')
-fprintf('Average earnings <sick>    = %f \n',ave_by_health.earnings(1))
-fprintf('Average earnings <all>     = %f \n',ave_by_health.earnings(2))
-fprintf('Average earnings <healthy> = %f \n',ave_by_health.earnings(3))
-disp('---')
-fprintf('Average assets <sick>    = %f \n',ave_by_health.assets(1))
-fprintf('Average assets <all>     = %f \n',ave_by_health.assets(2))
-fprintf('Average assets <healthy> = %f \n',ave_by_health.assets(3))
+ave1_sick.earnings = AllStats.sick.earnings.Mean;
+ave2_sick.earnings = sum(AgeStats.sick.earnings.Mean.*Params.mewj);
 
 %% Last check: compare conditional earnings given health=sick and given age
 
@@ -314,8 +279,8 @@ for a_c=1:n_a
     h = d_grid(Policy_cpu(1,a_c,z1_c,z2_c,e_c,theta_c,j));
     aprime = a_grid(Policy_cpu(2,a_c,z1_c,z2_c,e_c,theta_c,j));
     a_val = a_grid(a_c);
-    z1 = z1_grid(z1_c);
-    z2 = z2_grid(z2_c);
+    z1 = z_grid1(z1_c);
+    z2 = z_grid2(z2_c);
     e = e_grid(e_c);
     theta = Params.theta_i(theta_c);
     Values(a_c,z1_c,z2_c,e_c,theta_c,j) = ...
