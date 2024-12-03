@@ -299,7 +299,7 @@ fprintf('Average assets <healthy> = %f \n',ave_by_health.assets(3))
 income_sick1 = AgeStats.sick.earnings.Mean;
 
 Values = zeros(size(mu));
-
+Values_assets =  zeros(size(mu));
 for j=1:N_j
 for theta_c=1:N_i
 for e_c=1:n_e
@@ -313,6 +313,7 @@ for a_c=1:n_a
     z2 = z2_grid(z2_c);
     e = e_grid(e_c);
     theta = Params.theta_i(theta_c);
+    Values_assets(a_c,z1_c,z2_c,e_c,theta_c,j) = FnsToEvaluate.assets(h,aprime,a_val,z1,z2,e);
     Values(a_c,z1_c,z2_c,e_c,theta_c,j) = ...
         FnsToEvaluate.earnings(h,aprime,a_val,z1,z2,e,theta,Params.kappa_j(j),...
         Params.w,Params.agej(j),Params.Jr,Params.pen,Params.cut);
@@ -333,7 +334,7 @@ end
 err = abs(income_sick2-income_sick1);
 
 disp('Earnings by age, given sick: Error toolkit vs my code:')
-max(err)
+disp(max(err))
 
 % Average earnings given sick, in the whole population
 num = sum(Values(:,:,1,:,:,:).*mu(:,:,1,:,:,:),"all");
@@ -342,3 +343,12 @@ ave_earnings_sick_cpu = num/den;
 
 fprintf('Average earnings, given sick, toolkit = %f \n',AllStats.sick.earnings.Mean)
 fprintf('Average earnings, given sick, CPU     = %f \n',ave_earnings_sick_cpu)
+
+% Average assets given sick/healthy, whole population - AllStats.sick.assets.Mean
+%   (a,z1,z2,e,theta_i,j)
+num = sum(Values_assets(:,:,1,:,:,:).*mu(:,:,1,:,:,:),"all");
+den = sum(mu(:,:,1,:,:,:),"all");
+ave_assets_sick_cpu = num/den;
+num = sum(Values_assets(:,:,2,:,:,:).*mu(:,:,2,:,:,:),"all");
+den = sum(mu(:,:,2,:,:,:),"all");
+ave_assets_healthy_cpu = num/den;
