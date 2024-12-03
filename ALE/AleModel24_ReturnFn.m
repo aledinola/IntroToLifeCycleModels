@@ -6,11 +6,13 @@ function F=AleModel24_ReturnFn(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,sigma,psi,et
 
 F=-Inf;
 
-prod_loss = 1;
-if z2==0
-    % Bad health
-    prod_loss = cut;
-end
+% prod_loss = 1;
+% if z2==0
+%     % Bad health
+%     prod_loss = cut;
+% end
+
+prod_loss = (z2==0)*cut+(z2==1);
 
 if agej<Jr % If working age
     c=w*kappa_j*theta_i*z1*e*prod_loss*h+(1+r)*a-aprime; % Add z here

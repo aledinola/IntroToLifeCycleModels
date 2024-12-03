@@ -1,41 +1,18 @@
 %% Life-Cycle Model 24: Using Permanent Type to model fixed-effects
+% Changes wrt original example of Robert: 
+% Added a second Markov shock z2 (health), age-dependent
+% Compute moments using conditional restrictions by health (z2=0 vs z2=1)
 clear,clc,close all
 myf = fullfile('..','..','VFIToolkit-matlab');
 addpath(genpath(myf))
-% The exogenous process on labor efficiency units now uses an approach common in the literature:
-% Labor efficiency units are a combination of four components:
-% 1) kappa_j, a deterministic profile of age
-% 2) z, a persistent markov shock
-% 3) e, a transitory i.i.d. shock
-% 4) alpha_i, a fixed effect
-%
-% All of these were already present in Life-Cycle Model 11, except the fixed-effect alpha_i
-%
-% We want to have five different possible values of alpha_i, and to do this we use the 'permanent type', PType, feature.
-%
-% We here use the easiest approach, we will create alpha_i as a vector with
-% five values. And set N_i=5 (N_i is the number of permanent types). The
-% codes will automatically realise that because alpha_i has N_i values it
-% is different by permanent type.
-%
-% To compute the agent distribution we need to say how many agents are of
-% each type. We denote this 'alphadist' and it is a vector of weights that
-% sum to one (we need to put the name of this in PTypeDistParamNames, like
-% we would for a discount factor in DiscountFactorParamNames).
-%
-% All the commands we run look slightly different as they are the PType
-% versions of the commands until now. Permanent types are much more
-% powerful than just fixed-effects, and later models will show more options.
-%
-% Model statistics, like the life-cycle profiles we calculate here, are
-% reported both for each permanent type (that is to say, conditional on the
-% permanent type), and 'grouped' across the permanent types. 
 
 %% How does VFI Toolkit think about this?
 %
 % One decision variable: h, labour hours worked
 % One endogenous state variable: a, assets (total household savings)
-% Two stochastic exogenous state variables: z and e, persistent and transitory shocks to labor efficiency units, respectively
+% Two exogenous state variables: z (z1 is income and z2 is health)
+%   Note that the second z shock is age-dependent
+% One iid shock e
 % Age: j
 % Permanent types: i
 
@@ -100,34 +77,45 @@ Params.sj=1-Params.dj(21:101); % Conditional survival probabilities
 % you are alive in J, is equal to 0 by construction.
 Params.sj(end)=0; 
 
-%% Grids
+%% Assets and labor grids
 a_max = 100;
 a_grid=a_max*(linspace(0,1,n_a).^3)'; % The ^3 means most points are near zero, which is where the derivative of the value fn changes most.
+% Grid for labour choice
+h_grid=linspace(0,1,n_d)'; % Notice that it is imposing the 0<=h<=1 condition implicitly
 
-% First, the AR(1) process z1
+%% AR(1) process z1
 tauchenopt.parallel=0;
 [z1_grid,pi_z1]=discretizeAR1_Tauchen(0,Params.rho_z,Params.sigma_epsilon_z,n_z(1),3,tauchenopt);
 z1_grid=exp(z1_grid); % Take exponential of the grid
 [mean_z1,~,~,~]=MarkovChainMoments(z1_grid,pi_z1); % Calculate the mean of the grid so as can normalise it
 z1_grid=z1_grid/mean_z1; % Normalise the grid on z (so that the mean of z is 1)
 
-% Second, the health shock z2
+% Second, the health shock z2, which is age-dependent
 Params.cut = 0.5; % productivity cut if health is bad
 z2_grid = [0,1]'; %0=bad health, 1=good health
-pi_z2 = [0.6, 0.4;
-         0.2, 0.8];
-aux = pi_z2^1000;
-z2_stationary = aux(1,:)';
-z2_stationary = z2_stationary/sum(z2_stationary);
+p_bb_j = linspace(0.3,0.6,N_j); % prob from bad health to bad health
+p_gb_j = linspace(0.0,0.2,N_j); % prob from good health to bad health
+pi_z2_J = zeros(n_z(2),n_z(2),N_j);
+for j=1:N_j
+    prob_j = [p_bb_j(j),1-p_bb_j(j);
+              p_gb_j(j),1-p_gb_j(j)];
+    if any(abs(sum(prob_j,2)-1)>1e-10)
+        fprintf('j = %d \n',j)
+        error('prob_j does not sum to one!')
+    end
+    pi_z2_J(:,:,j) = prob_j;
+end
+check_markov_age(pi_z2_J,n_z(2),N_j);
+
 % Initial distribution of z2 at age 1, potentially different from the
 % stationary distribution of pi_z2
-%health_dist   = [0.05,0.95];
-health_dist   = z2_stationary;
-% Now the iid normal process e
+health_dist = [0.05,0.95];
+
+%% Now the iid normal process e
 [e_grid,pi_e]=discretizeAR1_Tauchen(0,0,Params.sigma_epsilon_e,n_e,3,tauchenopt);
-e_grid=exp(e_grid); % Take exponential of the grid
-pi_e=pi_e(1,:)'; % Because it is iid, the distribution is just the first row (all rows are identical). We use pi_e as a column vector for VFI Toolkit to handle iid variables.
-mean_e=pi_e'*e_grid; % Because it is iid, pi_e is the stationary distribution (you could just use MarkovChainMoments(), I just wanted to demonstate a handy trick)
+e_grid=exp(e_grid);   % Take exponential of the grid
+pi_e  =pi_e(1,:)';    % Because it is iid, the distribution is just the first row (all rows are identical). We use pi_e as a column vector for VFI Toolkit to handle iid variables.
+mean_e=pi_e'*e_grid;  % Because it is iid, pi_e is the stationary distribution (you could just use MarkovChainMoments(), I just wanted to demonstate a handy trick)
 e_grid=e_grid/mean_e; % Normalise the grid on z (so that the mean of e is 1)
 % To use e variables we have to put them into the vfoptions and simoptions
 vfoptions.n_e=n_e;
@@ -137,15 +125,18 @@ simoptions.n_e=vfoptions.n_e;
 simoptions.e_grid=vfoptions.e_grid;
 simoptions.pi_e=vfoptions.pi_e;
 
-% Grid for labour choice
-h_grid=linspace(0,1,n_d)'; % Notice that it is imposing the 0<=h<=1 condition implicitly
-% Switch into toolkit notation
+%% Switch into toolkit notation
 d_grid=h_grid;
 
-z_grid = [z1_grid;z2_grid]; % size is [n_z(1)+n_z(2),1]
-pi_z   = kron(pi_z2,pi_z1); % kron in reverse order
-%z_grid = z_grid1; 
-%pi_z   = pi_z1; 
+z_grid = [z1_grid;z2_grid]; % size is [n_z1+n_z2,1]
+% pi_z2_J is [nz2,nz2,J], pi_z1 is [nz1,nz1]
+pi_z1_J = repmat(pi_z1,[1,1,N_j]); % becomes [nz1,nz1,J]
+pi_z = zeros(prod(n_z),prod(n_z),N_j); % [nz1*nz2,nz1*nz2,J]
+for j=1:N_j
+    pi_z(:,:,j) = kron(pi_z2_J(:,:,j),pi_z1_J(:,:,j)); % kron in reverse order
+end
+
+check_markov_age(pi_z,prod(n_z),N_j);
 
 %% Now, create the return function 
 DiscountFactorParamNames={'beta','sj'};
@@ -170,17 +161,14 @@ disp('Check size of Policy:')
 disp(size(Policy.ptype001))
 disp([length(n_d)+length(n_a),n_a,n_z(1),n_z(2),n_e,N_j])
 
-%% Now, we want to graph Life-Cycle Profiles
-
 %% Initial distribution of agents at birth (j=1)
 % We have to define how agents are at age j=1. We will give them all zero assets.
 jequaloneDist=zeros([n_a,n_z(1),n_z(2),n_e]); % Put no households anywhere on grid
-%jequaloneDist(1,floor((n_z(1)+1)/2),:,floor((n_e+1)/2))=health_dist;
-jequaloneDist(1,floor((n_z(1)+1)/2),2,floor((n_e+1)/2))=1;
+jequaloneDist(1,floor((n_z(1)+1)/2),:,floor((n_e+1)/2))=health_dist;
 % All agents start with 
 % a:  zero assets 
 % z1: median value
-% z2: it depends
+% z2: non-degenerate distribution
 % e:  median value
 % ***theta: This is permanent type, distrib is fixed and set elsewhere
 
@@ -192,15 +180,16 @@ end
 Params.mewj=Params.mewj./sum(Params.mewj); % Normalize to one
 AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mass of agents of each age
 StatDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,N_i,pi_z,Params,simoptions);
-% Again, we will explain in a later model what the stationary distribution
-% is, it is not important for our current goal of graphing the life-cycle profile
 
 % Check that the distribution sums to one for each type
 sum(StatDist.ptype001,'all')
 sum(StatDist.ptype002,'all')
 
+% Convert distribution and policy functions from toolkit GPU to arrays on 
+% the cpu, adding the PT as an extra dimension in the arrays (instead of a 
+% structure as in the toolkit) 
 [mu,Policy_cpu] = reshape_VandPolicy(StatDist,Policy,n_a,n_z,n_e,N_i,N_j);
-% (a,z1,e,theta_i,j)
+% State variables: (a,z1,z2,e,theta_i,j)
 mu_a = sum(mu,[2,3,4,5,6]);
 
 % figure
@@ -238,11 +227,13 @@ toc
 
 %% Plot
 
+% Share of sick hourseholds
 figure
 plot(1:1:Params.J,AgeStats.share_sick.Mean)
 xlabel('Age, j')
 title('Share of sick households in the pop.')
 
+% Earnings
 figure
 plot(1:1:Params.J,AgeStats.sick.earnings.Mean)
 hold on
@@ -254,6 +245,19 @@ title('Earnings by health status')
 xlabel('Age, j')
 legend('Sick','All','Healthy')
 
+% Worked hours h
+figure
+plot(1:1:Params.J,AgeStats.sick.hours.Mean)
+hold on
+plot(1:1:Params.J,AgeStats.hours.Mean)
+hold on
+plot(1:1:Params.J,AgeStats.healthy.hours.Mean)
+hold off
+title('Worked hours by health status')
+xlabel('Age, j')
+legend('Sick','All','Healthy')
+
+% Assets
 figure
 plot(1:1:Params.J,AgeStats.sick.assets.Mean)
 hold on
@@ -266,26 +270,12 @@ xlabel('Age, j')
 legend('Sick','All','Healthy')
 
 %% My checks
-
-% Recover aggregate variables from conditional averages. 
-% Suppose X is our variable of interest (e.g. consumption) and we have the
-% conditional average by age. Given this, we want to recover the
-% unconditional average. We can do this:
-%   E[X] = sum_j \{ E[X|j]*prob(j) \}
-% To check, compare to AllStats.X.Mean
-
-
-ave1.earnings = AllStats.earnings.Mean;
-
-% Conditional only on age
-ave2.earnings = sum(AgeStats.earnings.Mean.*Params.mewj);
-
-disp(ave1.earnings)
-disp(ave2.earnings)
-
 ave_by_health.earnings = [AllStats.sick.earnings.Mean,...
                           AllStats.earnings.Mean,...
                           AllStats.healthy.earnings.Mean];
+ave_by_health.hours = [AllStats.sick.hours.Mean,...
+                          AllStats.hours.Mean,...
+                          AllStats.healthy.hours.Mean];
 ave_by_health.assets = [AllStats.sick.assets.Mean,...
                           AllStats.assets.Mean,...
                           AllStats.healthy.assets.Mean];
@@ -295,6 +285,11 @@ fprintf('Average earnings <sick>    = %f \n',ave_by_health.earnings(1))
 fprintf('Average earnings <all>     = %f \n',ave_by_health.earnings(2))
 fprintf('Average earnings <healthy> = %f \n',ave_by_health.earnings(3))
 disp('---')
+fprintf('Average hours <sick>    = %f \n',ave_by_health.hours(1))
+fprintf('Average hours <all>     = %f \n',ave_by_health.hours(2))
+fprintf('Average hours <healthy> = %f \n',ave_by_health.hours(3))
+disp('---')
+disp('THIS IS NOT CONSISTENT WITH THE ASSETS GRAPH!!!!')
 fprintf('Average assets <sick>    = %f \n',ave_by_health.assets(1))
 fprintf('Average assets <all>     = %f \n',ave_by_health.assets(2))
 fprintf('Average assets <healthy> = %f \n',ave_by_health.assets(3))
@@ -337,9 +332,13 @@ end
 
 err = abs(income_sick2-income_sick1);
 
-disp('Error toolkit vs my code:')
+disp('Earnings by age, given sick: Error toolkit vs my code:')
 max(err)
 
-figure
-plot(err')
+% Average earnings given sick, in the whole population
+num = sum(Values(:,:,1,:,:,:).*mu(:,:,1,:,:,:),"all");
+den = sum(mu(:,:,1,:,:,:),"all"); %divide by mass of sick people
+ave_earnings_sick_cpu = num/den;
 
+fprintf('Average earnings, given sick, toolkit = %f \n',AllStats.sick.earnings.Mean)
+fprintf('Average earnings, given sick, CPU     = %f \n',ave_earnings_sick_cpu)

@@ -1,5 +1,6 @@
 function [] = check_markov_age(trans_mat,n_z,J)
-% Check that 3 dim trnasition matrix is OK
+% Check that 3 dim transition matrix is OK, namely that each row sums to
+% one, for each age j=1,2,...,J
 
 if ~isequal(size(trans_mat),[n_z,n_z,J])
     error('trans_mat has wrong size')
@@ -20,4 +21,4 @@ for jj=1:J
     end
 end
 
-end
+end %end function 

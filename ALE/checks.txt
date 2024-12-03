@@ -1,0 +1,2 @@
+Average earnings, given sick, toolkit = 0.289022 
+Average earnings, given sick, CPU     = 0.289022
