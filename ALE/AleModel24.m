@@ -352,3 +352,6 @@ ave_assets_sick_cpu = num/den;
 num = sum(Values_assets(:,:,2,:,:,:).*mu(:,:,2,:,:,:),"all");
 den = sum(mu(:,:,2,:,:,:),"all");
 ave_assets_healthy_cpu = num/den;
+
+[ave_assets_sick_cpu,ave_assets_healthy_cpu]
+[AllStats.sick.assets.Mean,AllStats.healthy.assets.Mean]
