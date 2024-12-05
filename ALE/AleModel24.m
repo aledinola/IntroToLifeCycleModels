@@ -208,6 +208,7 @@ FnsToEvaluate.earnings=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut)..
 FnsToEvaluate.assets=@(h,aprime,a,z1,z2,e) a; % a is the current asset holdings
 FnsToEvaluate.theta_i=@(h,aprime,a,z1,z2,e,theta_i) theta_i; % theta_i is the fixed effect
 FnsToEvaluate.share_sick=@(h,aprime,a,z1,z2,e) (z2==0); %share of sick people
+FnsToEvaluate.agej=@(h,aprime,a,z1,z2,e,agej) agej; % Age j
 
 %--- Conditional restrictions. Must return either 0 or 1
 condres.sick = @(h,aprime,a,z1,z2,e) (z2==0);
@@ -215,10 +216,22 @@ condres.healthy = @(h,aprime,a,z1,z2,e) (z2==1);
 % Add additional field to simoptions
 simoptions.conditionalrestrictions = condres;
 
+%% Calculate Lorenz curve of assets manually
+Values_assets1 = repmat(a_grid,[1,n_z(1),n_z(2),n_e,N_i,N_j]);
+Values_assets1 = Values_assets1(:);
+StatDist1      = mu(:);
+
+[relpop,relz] = mylorenz(Values_assets1,StatDist1);
+
+figure
+plot(relpop,relpop,relpop,relz)
+
 %% Calculate the life-cycle profiles
 disp('LifeCycleProfiles_FHorz_Case1_PType')
 % Computation of Gini with cond restric takes a HUGE amount of time!
 simoptions.whichstats = [1,1,1,1,0,0,0];
+simoptions.agegroupings=1:10:N_j; % 5-year bins
+age_vec = 1:10:N_j;
 tic
 AgeStats=LifeCycleProfiles_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
 time_age=toc;
@@ -229,21 +242,23 @@ tic
 AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
 time_all=toc;
 
+AllStats.assets.Gini
+
 %% Plot
 
 % Share of sick hourseholds
 figure
-plot(1:1:Params.J,AgeStats.share_sick.Mean)
+plot(age_vec,AgeStats.share_sick.Mean)
 xlabel('Age, j')
 title('Share of sick households in the pop.')
 
 % Earnings
 figure
-plot(1:1:Params.J,AgeStats.sick.earnings.Mean)
+plot(age_vec,AgeStats.sick.earnings.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.earnings.Mean)
+plot(age_vec,AgeStats.earnings.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.healthy.earnings.Mean)
+plot(age_vec,AgeStats.healthy.earnings.Mean)
 hold off
 title('Earnings by health status')
 xlabel('Age, j')
@@ -251,11 +266,11 @@ legend('Sick','All','Healthy')
 
 % Worked hours h
 figure
-plot(1:1:Params.J,AgeStats.sick.hours.Mean)
+plot(age_vec,AgeStats.sick.hours.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.hours.Mean)
+plot(age_vec,AgeStats.hours.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.healthy.hours.Mean)
+plot(age_vec,AgeStats.healthy.hours.Mean)
 hold off
 title('Worked hours by health status')
 xlabel('Age, j')
@@ -263,15 +278,31 @@ legend('Sick','All','Healthy')
 
 % Assets
 figure
-plot(1:1:Params.J,AgeStats.sick.assets.Mean)
+plot(age_vec,AgeStats.sick.assets.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.assets.Mean)
+plot(age_vec,AgeStats.assets.Mean)
 hold on
-plot(1:1:Params.J,AgeStats.healthy.assets.Mean)
+plot(age_vec,AgeStats.healthy.assets.Mean)
 hold off
 title('Assets by health status')
 xlabel('Age, j')
 legend('Sick','All','Healthy')
+
+% Inequality for assets, whole population
+cv_assets = AgeStats.assets.StdDev./max(AgeStats.assets.Mean,1e-12);
+% At the start of life-cycle, everyone has zero assets, so std(assets)=0
+% and mean(assets)=0, hence cv(assets)=NaN, but economically it should be
+% zero
+
+figure
+plot(age_vec,AgeStats.assets.Gini)
+title('Gini of Assets by age')
+xlabel('Age, j')
+
+figure
+plot(age_vec,cv_assets)
+title('Coefficient of variation of Assets by age')
+xlabel('Age, j')
 
 %% My checks
 ave_by_health.earnings = [AllStats.sick.earnings.Mean,...
@@ -283,6 +314,9 @@ ave_by_health.hours = [AllStats.sick.hours.Mean,...
 ave_by_health.assets = [AllStats.sick.assets.Mean,...
                           AllStats.assets.Mean,...
                           AllStats.healthy.assets.Mean];
+gini_by_health.assets=[AllStats.sick.assets.Gini,...
+                        AllStats.assets.Gini,...
+                        AllStats.healthy.assets.Gini];
 
 disp('SUMMARY STATISTICS')
 fprintf('Average earnings <sick>    = %f \n',ave_by_health.earnings(1))
@@ -293,14 +327,17 @@ fprintf('Average hours <sick>    = %f \n',ave_by_health.hours(1))
 fprintf('Average hours <all>     = %f \n',ave_by_health.hours(2))
 fprintf('Average hours <healthy> = %f \n',ave_by_health.hours(3))
 disp('---')
-disp('THIS IS NOT CONSISTENT WITH THE ASSETS GRAPH!!!!')
 fprintf('Average assets <sick>    = %f \n',ave_by_health.assets(1))
 fprintf('Average assets <all>     = %f \n',ave_by_health.assets(2))
 fprintf('Average assets <healthy> = %f \n',ave_by_health.assets(3))
+disp('---')
+fprintf('Gini assets <sick>    = %f \n',gini_by_health.assets(1))
+fprintf('Gini assets <all>     = %f \n',gini_by_health.assets(2))
+fprintf('Gini assets <healthy> = %f \n',gini_by_health.assets(3))
 
 %% Last check: compare conditional earnings given health=sick and given age
 
-income_sick1 = AgeStats.sick.earnings.Mean;
+%income_sick1 = AgeStats.sick.earnings.Mean;
 
 Values = zeros(size(mu));
 Values_assets =  zeros(size(mu));
@@ -335,10 +372,10 @@ for j=1:N_j
     income_sick2(1,j) = num/den;
 end
 
-err = abs(income_sick2-income_sick1);
+%err = abs(income_sick2-income_sick1);
 
-disp('Earnings by age, given sick: Error toolkit vs my code:')
-disp(max(err))
+%disp('Earnings by age, given sick: Error toolkit vs my code:')
+%disp(max(err))
 
 % Average earnings given sick, in the whole population
 num = sum(Values(:,:,1,:,:,:).*mu(:,:,1,:,:,:),"all");
@@ -363,7 +400,7 @@ ave_assets_healthy_cpu = num/den;
 %% Another check
 % Average assets given health=sick
 xx1 = AllStats.sick.assets.Mean; 
-xx2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*Params.mewj)/(sum(AgeStats.share_sick.Mean.*Params.mewj));
+xx2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*AgeStats.agej.Mean)/(sum(AgeStats.share_sick.Mean.*AgeStats.agej.Mean));
 [xx1,xx2]
 
 disp('RUNNING TIMES FOR SUBPARTS OF PROGRAM:')
