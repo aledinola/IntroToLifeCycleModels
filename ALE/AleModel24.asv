@@ -152,7 +152,7 @@ vfoptions.level1n = 11;
 tic;
 vfoptions.verbose=1; % Just so we can see feedback on progress
 [V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,N_i, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, vfoptions);
-time_vfi=toc;
+toc
 
 disp('Check size of V:')
 disp(size(V.ptype001))
@@ -179,10 +179,7 @@ for jj=2:length(Params.mewj)
 end
 Params.mewj=Params.mewj./sum(Params.mewj); % Normalize to one
 AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mass of agents of each age
-
-tic
 StatDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,N_i,pi_z,Params,simoptions);
-time_dist=toc;
 
 % Check that the distribution sums to one for each type
 sum(StatDist.ptype001,'all')
@@ -217,17 +214,16 @@ simoptions.conditionalrestrictions = condres;
 
 %% Calculate the life-cycle profiles
 disp('LifeCycleProfiles_FHorz_Case1_PType')
-% Computation of Gini with cond restric takes a HUGE amount of time!
-simoptions.whichstats = [1,1,1,1,0,0,0];
+simoptions.whichstats = [1,1,0,0,0,0,0];
 tic
 AgeStats=LifeCycleProfiles_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
-time_age=toc;
+toc
 
 %% Note that if we want statistics for the distribution as a whole we could use 
 disp('EvalFnOnAgentDist_AllStats_FHorz_Case1_PType')
 tic
 AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
-time_all=toc;
+toc
 
 %% Plot
 
@@ -363,11 +359,4 @@ ave_assets_healthy_cpu = num/den;
 %% Another check
 % Average assets given health=sick
 xx1 = AllStats.sick.assets.Mean; 
-xx2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*Params.mewj)/(sum(AgeStats.share_sick.Mean.*Params.mewj));
-[xx1,xx2]
-
-disp('RUNNING TIMES FOR SUBPARTS OF PROGRAM:')
-fprintf('Time for VFI: %f \n',time_vfi)
-fprintf('Time for Distr: %f \n',time_dist)
-fprintf('Time for AgeStats: %f \n',time_age)
-fprintf('Time for AllStats: %f \n',time_all)
+xx2 = AgeStats.sick.assets.Mean
