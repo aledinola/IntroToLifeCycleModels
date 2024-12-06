@@ -221,17 +221,18 @@ Values_assets1 = repmat(a_grid,[1,n_z(1),n_z(2),n_e,N_i,N_j]);
 Values_assets1 = Values_assets1(:);
 StatDist1      = mu(:);
 
-[relpop,relz] = mylorenz(Values_assets1,StatDist1);
+%[relpop,relz] = mylorenz(Values_assets1,StatDist1);
 
-figure
-plot(relpop,relpop,relpop,relz)
+%figure
+%plot(relpop,relpop,relpop,relz)
 
 %% Calculate the life-cycle profiles
 disp('LifeCycleProfiles_FHorz_Case1_PType')
 % Computation of Gini with cond restric takes a HUGE amount of time!
-simoptions.whichstats = [1,1,1,1,0,0,0];
-simoptions.agegroupings=1:10:N_j; % 5-year bins
-age_vec = 1:10:N_j;
+simoptions.whichstats  = [1,1,1,2,0,0,0];
+%simoptions.whichstats = [1,1,1,1,0,0,0];
+%simoptions.agegroupings=1:10:N_j; % 5-year bins
+age_vec = 1:1:N_j;
 tic
 AgeStats=LifeCycleProfiles_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
 time_age=toc;
@@ -404,6 +405,8 @@ xx2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*AgeStats.agej.Mea
 [xx1,xx2]
 
 disp('RUNNING TIMES FOR SUBPARTS OF PROGRAM:')
+disp('simoptions.whichstats = ')
+disp(simoptions.whichstats)
 fprintf('Time for VFI: %f \n',time_vfi)
 fprintf('Time for Distr: %f \n',time_dist)
 fprintf('Time for AgeStats: %f \n',time_age)
