@@ -229,7 +229,7 @@ StatDist1      = mu(:);
 %% Calculate the life-cycle profiles
 disp('LifeCycleProfiles_FHorz_Case1_PType')
 % Computation of Gini with cond restric takes a HUGE amount of time!
-simoptions.whichstats  = [1,1,1,2,0,0,0];
+%simoptions.whichstats  = [1,1,1,2,0,0,0];
 %simoptions.whichstats = [1,1,1,1,0,0,0];
 %simoptions.agegroupings=1:10:N_j; % 5-year bins
 age_vec = 1:1:N_j;
