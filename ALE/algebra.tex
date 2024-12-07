@@ -1,0 +1,81 @@
+%\input{tcilatex}
+%\input{tcilatex}
+%\input{tcilatex}
+
+
+\documentclass[12pt]{article}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage[a4paper]{geometry}
+\usepackage{color}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[authoryear]{natbib}
+\usepackage{ulem}
+\usepackage{rotating}
+\usepackage[unicode=true,
+bookmarks=true,bookmarksnumbered=false,bookmarksopen=true,bookmarksopenlevel=1,
+breaklinks=true,pdfborder={0 0 1},backref=section,colorlinks=true]{hyperref}
+\usepackage{amsthm}
+\usepackage{color}
+\usepackage{placeins}
+\usepackage{subcaption}
+\usepackage{amsfonts}
+
+\setcounter{MaxMatrixCols}{10}
+%TCIDATA{OutputFilter=Latex.dll}
+%TCIDATA{Version=5.50.0.2953}
+%TCIDATA{<META NAME="SaveForMode" CONTENT="1">}
+%TCIDATA{BibliographyScheme=Manual}
+%TCIDATA{LastRevised=Saturday, December 07, 2024 18:38:58}
+%TCIDATA{<META NAME="GraphicsSave" CONTENT="32">}
+
+\geometry{verbose}
+\PassOptionsToPackage{normalem}{ulem}
+\hypersetup{
+plainpages=false,urlcolor=magenta,citecolor=magenta,linkcolor=blue,pdfstartview=FitH,pdfview=FitH,plainpages=false,urlcolor=blue,citecolor=blue,linkcolor=blue,pdfstartview=FitH,pdfview=FitH}
+\makeatletter
+\graphicspath{{Figures/}} 
+\setlength{\marginparwidth}{0in} \setlength{\marginparsep}{0in}
+\setlength{\oddsidemargin}{0in} \setlength{\evensidemargin}{0in}
+\setlength{\textwidth}{6.35in} \setlength{\topmargin}{-.50in}
+\setlength{\textheight}{9.45in}
+\renewcommand{\baselinestretch}{1.2}\small\normalsize
+\providecommand{\tabularnewline}{\\}
+\newcommand{\ssskip}{\vspace*{0.05cm}}
+\newcommand{\sskip}{\vspace*{0.15cm}}
+\newcommand{\lskip}{\vspace*{0.45cm}}
+\makeatother
+
+%\input{tcilatex}
+
+\begin{document}
+
+
+\begin{itemize}
+\item The state variables are $\left( a,z_{1},z_{2},e,\theta ,j\right) $,
+where $z_{1}$ and $z_{2}$ are two exogenous states (Markov), $e$ is iid
+exogenous state, $\theta $ is permanent type, $j$ is age.
+
+\item The shock $z_{2}\in \left\{ 1,2\right\} $ (sick vs healthy) is
+age-dependent and type-dependent.
+
+\item Let the distribution be denoted as $\mu $.
+
+\item Average assets $a$, conditional on health status being sick (i.e. $%
+z_{2}=1$)%
+\begin{equation*}
+E\left[ a|z_{2}=1\right] =\frac{\sum_{a,z_{1},e,\theta ,j}a\times \mu \left(
+a,z_{1},1,e,\theta ,j\right) }{\sum_{a,z_{1},e,\theta ,j}\mu \left(
+a,z_{1},1,e,\theta ,j\right) }
+\end{equation*}
+
+\item Note that the denominator in the expression above denotes the share of
+sick people in the population.
+
+\item In the toolkit, $E\left[ a|z_{2}=1\right] $ is given by \texttt{%
+AllStats.sick.assets.Mean}
+\end{itemize}
+
+\end{document}

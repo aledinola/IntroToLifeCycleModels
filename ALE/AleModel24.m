@@ -127,6 +127,9 @@ check_markov_age(pi_z2_J.low,n_z(2),N_j);
 disp('Checking pi_z2_J.high...')
 check_markov_age(pi_z2_J.high,n_z(2),N_j);
 
+% IMPORTANT
+%pi_z2_J.low = pi_z2_J.high;
+
 % Initial distribution of z2 at age 1, potentially different from the
 % stationary distribution of pi_z2
 health_dist = [0.05,0.95];
@@ -213,11 +216,12 @@ sum(StatDist.high,'all')
 % Convert distribution and policy functions from toolkit GPU to arrays on 
 % the cpu, adding the PT as an extra dimension in the arrays (instead of a 
 % structure as in the toolkit) 
-[mu,Policy_cpu] = reshape_VandPolicy(StatDist,Policy,n_a,n_z,n_e,N_i,N_j);
+[mu_cpu,Policy_cpu] = reshape_VandPolicy(StatDist,Policy,n_a,n_z,n_e,N_i,N_j);
 
 % Check distribution
+disp('Check distribution')
 mu1 = gather(StatDist.low);
-mu2 = squeeze(mu(:,:,:,:,1,:))/StatDist.ptweights(1);
+mu2 = squeeze(mu_cpu(:,:,:,:,1,:))/StatDist.ptweights(1);
 max(abs(mu1-mu2),[],"all")
 
 % State variables: (a,z1,z2,e,theta_i,j)
@@ -234,9 +238,7 @@ FnsToEvaluate.hours=@(h,aprime,a,z1,z2,e) h; % h is fraction of time worked
 FnsToEvaluate.earnings=@(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut)...
     fun_earnings(h,aprime,a,z1,z2,e,theta_i,kappa_j,w,agej,Jr,pen,cut);
 FnsToEvaluate.assets=@(h,aprime,a,z1,z2,e) a; % a is the current asset holdings
-FnsToEvaluate.theta_i=@(h,aprime,a,z1,z2,e,theta_i) theta_i; % theta_i is the fixed effect
 FnsToEvaluate.share_sick=@(h,aprime,a,z1,z2,e) (z2==0); %share of sick people
-FnsToEvaluate.agej=@(h,aprime,a,z1,z2,e,agej) agej; % Age j
 
 %--- Conditional restrictions. Must return either 0 or 1
 condres.sick = @(h,aprime,a,z1,z2,e) (z2==0);
@@ -261,8 +263,8 @@ tic
 AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1_PType(StatDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,N_i,d_grid, a_grid, z_grid, simoptions);
 time_all=toc;
 
-% %% Plot
-% 
+%% Plot
+ 
 % Share of sick hourseholds
 figure
 plot(age_vec,AgeStats.share_sick.low.Mean)
@@ -273,6 +275,118 @@ plot(age_vec,AgeStats.share_sick.high.Mean)
 xlabel('Age, j')
 legend('Low type','All','High type')
 title('Share of sick households by age')
+
+%% Values on grid
+tic
+Values1=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(StatDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,N_i,d_grid,a_grid,z_grid,simoptions);
+time_ValuesOnGrid=toc;
+
+% Recompute Values on grid manually and check if results are the same
+n_theta = numel(N_i);
+Values2_assets     = zeros(size(mu_cpu)); %(a,z1,z2,e,N_i,N_j)
+Values2_hours      = zeros(size(mu_cpu));
+Values2_earnings   = zeros(size(mu_cpu));
+Values2_share_sick = zeros(size(mu_cpu));
+for j=1:N_j
+for theta_c=1:n_theta
+for e_c=1:n_e
+for z2_c=1:n_z(2)
+for z1_c=1:n_z(1)
+for a_c=1:n_a
+    h = d_grid(Policy_cpu(1,a_c,z1_c,z2_c,e_c,theta_c,j));
+    aprime = a_grid(Policy_cpu(2,a_c,z1_c,z2_c,e_c,theta_c,j));
+    a_val = a_grid(a_c);
+    z1 = z1_grid(z1_c);
+    z2 = z2_grid(z2_c);
+    e = e_grid(e_c);
+    theta = Params.theta_i(theta_c);
+    Values2_assets(a_c,z1_c,z2_c,e_c,theta_c,j) = FnsToEvaluate.assets(h,aprime,a_val,z1,z2,e);
+    Values2_hours(a_c,z1_c,z2_c,e_c,theta_c,j) = FnsToEvaluate.hours(h,aprime,a_val,z1,z2,e);
+    Values2_share_sick(a_c,z1_c,z2_c,e_c,theta_c,j) = FnsToEvaluate.share_sick(h,aprime,a_val,z1,z2,e);
+    Values2_earnings(a_c,z1_c,z2_c,e_c,theta_c,j) = ...
+        FnsToEvaluate.earnings(h,aprime,a_val,z1,z2,e,theta,Params.kappa_j(j),...
+        Params.w,Params.agej(j),Params.Jr,Params.pen,Params.cut);
+
+end
+end
+end
+end
+end
+end
+
+% Checks
+err = max(abs(Values1.assets.low-squeeze(Values2_assets(:,:,:,:,1,:))),[],"all")
+err = max(abs(Values1.assets.high-squeeze(Values2_assets(:,:,:,:,2,:))),[],"all")
+
+err = max(abs(Values1.hours.low-squeeze(Values2_hours(:,:,:,:,1,:))),[],"all")
+err = max(abs(Values1.hours.high-squeeze(Values2_hours(:,:,:,:,2,:))),[],"all")
+
+err = max(abs(Values1.earnings.low-squeeze(Values2_earnings(:,:,:,:,1,:))),[],"all")
+err = max(abs(Values1.earnings.high-squeeze(Values2_earnings(:,:,:,:,2,:))),[],"all")
+
+err = max(abs(Values1.share_sick.low-squeeze(Values2_share_sick(:,:,:,:,1,:))),[],"all")
+err = max(abs(Values1.share_sick.high-squeeze(Values2_share_sick(:,:,:,:,2,:))),[],"all")
+
+%% More checks
+
+Values_assets = repmat(a_grid,[1,n_z(1),n_z(2),n_e,N_j]);
+
+disp('Check Values on Grid:')
+err1 = max(abs(Values_assets-Values1.assets.low),[],"all");
+err2 = max(abs(Values_assets-Values1.assets.high),[],"all");
+disp([err1,err2])
+
+mu_age = reshape(sum(mu_cpu,[1,2,3,4,5]),1,N_j);
+
+disp('Check age marginal distribution')
+disp(max(abs(mu_age-Params.mewj)))
+
+disp('Check share of sick in whole pop.')
+share_sick1 = AllStats.share_sick.Mean; 
+share_sick2 = sum(AgeStats.share_sick.Mean.*Params.mewj);
+disp([share_sick1,share_sick2])
+ 
+disp('Check the average of share sick, conditional on age')
+age_sick_share1 = AgeStats.share_sick.Mean;
+%                                a,z1,z2,e,PT,j
+age_sick_share2 = reshape(sum(mu_cpu(:,:, 1, :, :,:),[1,2,3,4,5]),[1,N_j])./Params.mewj;
+
+err = max(abs(age_sick_share1-age_sick_share2))
+
+disp('BUG: Check mean assets conditional on health=sick')
+age_sick_assets1 = AllStats.sick.assets.Mean;
+age_sick_assets2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*Params.mewj)/...
+    sum(AgeStats.share_sick.Mean.*Params.mewj);
+disp([age_sick_assets1,age_sick_assets2])
+% My calculation
+Values_assets = zeros(size(mu_cpu));
+Values_assets(:,:,:,:,1,:) = Values1.assets.low;
+Values_assets(:,:,:,:,2,:) = Values1.assets.high;
+age_sick_assets3 = sum(Values_assets(:,:,1,:,:,:).*mu_cpu(:,:,1,:,:,:),"all")/...
+    sum(mu_cpu(:,:,1,:,:,:),"all");
+disp([age_sick_assets1,age_sick_assets2,age_sick_assets3])
+
+% Value_aprime = zeros([n_a,n_z(1),n_z(2),n_e,n_theta,N_j]);
+% 
+% for j=1:N_j
+% for theta_c=1:n_theta
+% for e_c=1:n_e
+% for z2_c=1:n_z(2)
+% for z1_c=1:n_z(1)
+% for a_c=1:n_a
+%     aprime = a_grid(Policy_cpu(2,a_c,z1_c,z2_c,e_c,theta_c,j));
+%     Value_aprime(a_c,z1_c,z2_c,e_c,theta_c,j) = aprime;
+% 
+% end
+% end
+% end
+% end
+% end
+% end
+% asset_age_sick4 = squeeze(sum(Value_aprime(:,:,1,:,:,:).*mu(:,:,1,:,:,:),[1,2,3,4,5]))...
+%     ./squeeze(sum(mu(:,:,1,:,:,:),[1,2,3,4,5]));
+% asset_age_sick_diff24 = max(abs(AgeStats.sick.assets.Mean'-asset_age_sick4));
+
 
 % % Earnings
 % figure
@@ -358,48 +472,6 @@ title('Share of sick households by age')
 % fprintf('Gini assets <healthy> = %f \n',gini_by_health.assets(3))
 % 
 %(a,z1,z2,e,theta_i,j)
-mu_age = reshape(sum(mu,[1,2,3,4,5]),1,Params.J);
-
-disp('Check age marginal distribution')
-disp(max(abs(mu_age-Params.mewj)))
-
-disp('Check share of sick in whole pop.')
-share_sick1 = AllStats.share_sick.Mean; 
-share_sick2 = sum(AgeStats.share_sick.Mean.*Params.mewj);
-disp([share_sick1,share_sick2])
- 
-disp('Check mean assets conditional on health=sick')
-xx1 = AllStats.sick.assets.Mean;
-xx2 = sum(AgeStats.sick.assets.Mean.*AgeStats.share_sick.Mean.*Params.mewj)/share_sick2;
-age_sick_share2 = AgeStats.share_sick.Mean.*Params.mewj;
-% My calculation
-Values_assets = repmat(a_grid,[1,n_z(1),n_z(2),n_e,n_theta,N_j]);
-age_sick_share3 = squeeze(sum(mu(:,:,1,:,:,:),[1,2,3,4,5]));
-age_sick_diff23 = max(abs(age_sick_share2'-age_sick_share3));
-asset_age_sick3 = squeeze(sum(Values_assets(:,:,1,:,:,:).*mu(:,:,1,:,:,:),[1,2,3,4,5]))...
-    ./squeeze(sum(mu(:,:,1,:,:,:),[1,2,3,4,5]));
-asset_age_sick_diff23 = max(abs(AgeStats.sick.assets.Mean'-asset_age_sick3));
-
-Value_aprime = zeros([n_a,n_z(1),n_z(2),n_e,n_theta,N_j]);
-
-for j=1:N_j
-for theta_c=1:n_theta
-for e_c=1:n_e
-for z2_c=1:n_z(2)
-for z1_c=1:n_z(1)
-for a_c=1:n_a
-    aprime = a_grid(Policy_cpu(2,a_c,z1_c,z2_c,e_c,theta_c,j));
-    Value_aprime(a_c,z1_c,z2_c,e_c,theta_c,j) = aprime;
-  
-end
-end
-end
-end
-end
-end
-asset_age_sick4 = squeeze(sum(Value_aprime(:,:,1,:,:,:).*mu(:,:,1,:,:,:),[1,2,3,4,5]))...
-    ./squeeze(sum(mu(:,:,1,:,:,:),[1,2,3,4,5]));
-asset_age_sick_diff24 = max(abs(AgeStats.sick.assets.Mean'-asset_age_sick4));
 
 % %(a,z1,z2,e,theta_i,j)
 % xx3 = sum(Values_assets(:,:,1,:,:,:).*mu(:,:,1,:,:,:),"all")/sum(mu(:,:,1,:,:,:),"all");
