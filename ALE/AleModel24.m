@@ -148,6 +148,8 @@ simoptions.n_e=vfoptions.n_e;
 simoptions.e_grid=vfoptions.e_grid;
 simoptions.pi_e=vfoptions.pi_e;
 
+simoptions.loopovere = 0; 
+
 %% Switch into toolkit notation
 d_grid=h_grid;
 
